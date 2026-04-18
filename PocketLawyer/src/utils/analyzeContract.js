@@ -1,4 +1,64 @@
-const RISK_ORDER = { low: 0, medium: 1, high: 2 }
+const RISK_ORDER = { info: 0, low: 1, medium: 2, high: 3 }
+
+const SYSTEM_PROMPT = `You are an expert legal analyst specialising in Indian contract law (Indian Contract Act 1872, Transfer of Property Act, Specific Relief Act, Consumer Protection Act, IT Act, and sector-specific regulations).
+
+Your job is to analyse contract documents page-by-page and extract a COMPLETE list of every identifiable clause or provision — not just the risky ones. Include informational clauses too.
+
+For every clause you find:
+• Assign ONE risk level: "high" (could cause serious harm/loss), "medium" (noteworthy, needs attention), "low" (standard but worth knowing), or "info" (purely informational, no risk)
+• Quote the original text verbatim or as a close paraphrase
+• Rewrite it in plain English a non-lawyer can understand
+• Explain WHY you assigned that risk level
+• Give a concrete, actionable recommendation
+• List any cross-references this clause makes (e.g. "See Schedule 2", "as per Clause 8.3")
+
+Also detect HIDDEN LEGAL REFERENCES — citations embedded in the text that a non-lawyer would overlook:
+• References to external statutes (e.g. "Section 138 of NI Act", "Article 226 of Constitution")
+• References to standard schedules, annexures, exhibits not reproduced in this excerpt
+• Industry-standard clauses cited by name only (e.g. "FIDIC conditions apply")
+• Defined terms that silently import obligations from elsewhere
+
+Return ONLY valid JSON — no prose, no markdown fences, no explanation outside the JSON object.`
+
+const USER_PROMPT = (batchNum, totalBatches) => `\
+This is part ${batchNum} of ${totalBatches} of the contract. \
+Extract ALL clauses and ALL hidden references visible on these pages only.
+
+Return this exact JSON shape (all fields required):
+{
+  "title": "<contract title or inferred type>",
+  "summary": "<2–3 sentence overview of what this contract does>",
+  "overallRisk": "<high|medium|low|info>",
+  "riskSummary": "<plain-English overall risk assessment, 1–2 sentences>",
+  "clauses": [
+    {
+      "id": 1,
+      "title": "<short clause name>",
+      "originalText": "<verbatim or close paraphrase from the document>",
+      "plainEnglish": "<what this means in plain language>",
+      "risk": "<high|medium|low|info>",
+      "riskReason": "<why this risk level was assigned>",
+      "recommendation": "<what the reader should do or watch out for>",
+      "relatedRefs": ["<e.g. Schedule 1>", "<e.g. Clause 9.2>"]
+    }
+  ],
+  "hiddenReferences": [
+    {
+      "ref": "<e.g. Section 73 of Indian Contract Act 1872>",
+      "explanation": "<what this reference means and why it matters to the reader>"
+    }
+  ]
+}`
+
+function extractJSON(text) {
+  // Strip common markdown fences and leading prose before the first {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error('No JSON object found in model response')
+  }
+  return JSON.parse(text.slice(start, end + 1))
+}
 
 async function analyzeBatch(files, batchNum, totalBatches) {
   const content = []
@@ -17,17 +77,15 @@ async function analyzeBatch(files, batchNum, totalBatches) {
     }
   }
 
-  content.push({
-    type: 'text',
-    text: `This is part ${batchNum} of ${totalBatches} of the contract. Extract ALL clauses and hidden references visible in these pages only. Return valid JSON only, no markdown: { "title": string, "summary": string, "overallRisk": "low"|"medium"|"high", "riskSummary": string, "clauses": [{ "id": number, "title": string, "text": string, "risk": "low"|"medium"|"high", "explanation": string }], "hiddenReferences": [{ "ref": string, "explanation": string }] }`,
-  })
+  content.push({ type: 'text', text: USER_PROMPT(batchNum, totalBatches) })
 
   const res = await fetch('/api/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      system: `You are an expert legal analyst specialising in Indian contract law. This is part ${batchNum} of ${totalBatches} of the contract. Extract ALL clauses and hidden references visible in these pages only.`,
+      system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content }],
+      max_tokens: 8192,
     }),
   })
 
@@ -37,14 +95,13 @@ async function analyzeBatch(files, batchNum, totalBatches) {
   }
 
   const { text } = await res.json()
-  const clean = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
-  return JSON.parse(clean)
+  return extractJSON(text)
 }
 
 function mergeResults(results) {
   const overallRisk = results.reduce(
     (max, r) => (RISK_ORDER[r.overallRisk] > RISK_ORDER[max] ? r.overallRisk : max),
-    'low'
+    'info'
   )
 
   const seenClauses = new Set()
