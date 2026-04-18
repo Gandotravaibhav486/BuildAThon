@@ -27,12 +27,18 @@ async function analyzeBatch(files, batchNum, totalBatches) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       system: `You are an expert legal analyst specialising in Indian contract law. This is part ${batchNum} of ${totalBatches} of the contract. Extract ALL clauses and hidden references visible in these pages only.`,
-      content,
+      messages: [{ role: 'user', content }],
     }),
   })
 
-  if (!res.ok) throw new Error(`Batch ${batchNum} failed: ${res.statusText}`)
-  return res.json()
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? `Batch ${batchNum} failed: ${res.statusText}`)
+  }
+
+  const { text } = await res.json()
+  const clean = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+  return JSON.parse(clean)
 }
 
 function mergeResults(results) {
