@@ -2,6 +2,7 @@ import { useState } from 'react'
 import UploadZone from './components/UploadZone.jsx'
 import ClauseCard from './components/ClauseCard.jsx'
 import HiddenRefCard from './components/HiddenRefCard.jsx'
+import SearchPanel from './components/SearchPanel.jsx'
 import { analyzeContract } from './utils/analyzeContract.js'
 
 /* ── Design tokens ─────────────────────────────────── */
@@ -190,11 +191,12 @@ function ClauseBreakdown({ results, activeFilter, onFilter }) {
   )
 }
 
-/* ── Main: View tabs (Clauses | References) ────────── */
+/* ── Main: View tabs (Clauses | References | Search) ── */
 function ViewTabs({ active, onChange, clauseCount, refCount }) {
   const tabs = [
     { key: 'clauses',    label: 'Clauses',    count: clauseCount },
     { key: 'references', label: 'References', count: refCount },
+    { key: 'search',     label: 'Search',     count: 0 },
   ]
   return (
     <div style={{ display: 'flex', borderBottom: '2px solid #e4ddd0', marginBottom: '1rem' }}>
@@ -402,6 +404,11 @@ export default function App() {
                 </div>
               )}
             </>
+          )}
+
+          {/* ── Search view ── */}
+          {view === 'search' && (
+            <SearchPanel files={files} hiddenRefs={allRefs} />
           )}
         </main>
       </div>
