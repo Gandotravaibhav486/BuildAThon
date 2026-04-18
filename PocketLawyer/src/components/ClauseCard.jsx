@@ -69,7 +69,7 @@ export default function ClauseCard({ clause, index, onAskAssistant }) {
           )}
 
           {/* Why It Matters + What To Do */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+          <div className="clause-info-grid">
             <InfoBox label="WHY IT MATTERS" bg="#fdf8f0" icon="⚠">
               {clause.riskReason}
             </InfoBox>

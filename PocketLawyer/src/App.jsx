@@ -6,6 +6,38 @@ import SearchPanel from './components/SearchPanel.jsx'
 import Chatbot from './components/Chatbot.jsx'
 import { analyzeContract } from './utils/analyzeContract.js'
 
+/* ── Error message helper ──────────────────────────── */
+function friendlyError(err) {
+  const msg = err?.message ?? String(err)
+  if (/fetch|network|failed to fetch/i.test(msg)) return 'Connection error — check your internet and try again.'
+  if (/401|api.?key|authentication/i.test(msg)) return 'API key error — check your ANTHROPIC_API_KEY.'
+  if (/429|rate.?limit/i.test(msg)) return 'Too many requests — please wait a moment and try again.'
+  if (/413|too.?large/i.test(msg)) return 'File too large — try uploading fewer or smaller pages.'
+  if (/500|server/i.test(msg)) return 'Server error — please try again in a moment.'
+  if (/json|parse/i.test(msg)) return 'Unexpected response — the model returned an unreadable format. Try again.'
+  return msg || 'Something went wrong. Please try again.'
+}
+
+function ErrorBanner({ message, onRetry }) {
+  return (
+    <div className="error-banner">
+      <span className="error-banner-icon">⚠</span>
+      <div>
+        <p className="error-banner-title">ANALYSIS ERROR</p>
+        <p style={{ fontFamily: "'Lora', serif", fontSize: '0.82rem', color: '#8a3a3a', lineHeight: 1.5 }}>{message}</p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.62rem', letterSpacing: '0.1em', color: '#e05252', background: 'transparent', border: '1px solid #e05252', borderRadius: '4px', padding: '3px 10px', marginTop: '0.5rem', cursor: 'pointer' }}
+          >
+            RETRY
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── Design tokens ─────────────────────────────────── */
 const RISK = {
   high:   { color: '#e05252', label: 'High Risk' },
@@ -240,7 +272,7 @@ function ViewTabs({ active, onChange, clauseCount, refCount }) {
 /* ── Main: Filter tabs ─────────────────────────────── */
 function FilterTabs({ active, onChange, counts }) {
   return (
-    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+    <div className="filter-tabs-row">
       {FILTERS.map(({ key, label }) => {
         const isActive = active === key
         const color = key === 'all' ? '#1a1a2e' : RISK[key]?.color ?? '#1a1a2e'
@@ -309,7 +341,7 @@ export default function App() {
       const data = await analyzeContract(files, setProgress)
       setResults(data)
     } catch (err) {
-      setError(err.message)
+      setError(friendlyError(err))
     } finally {
       setLoading(false)
       setProgress('')
@@ -333,36 +365,35 @@ export default function App() {
           <span style={{ fontSize: '2rem', lineHeight: 1 }}>⚖️</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <span style={s.brandName}>PocketLawyer</span>
-            <span style={s.subtitle}>CONTRACT RISK ANALYZER</span>
+            <span style={s.subtitle} className="header-subtitle">CONTRACT RISK ANALYZER</span>
           </div>
         </div>
-        <span style={s.headerBadge}>AI POWERED</span>
+        <span style={s.headerBadge} className="header-badge">AI POWERED</span>
       </header>
 
       {/* Upload + Analyze */}
-      <div style={s.uploadPanel}>
+      <div className="upload-panel">
         <UploadZone files={files} onFilesChange={setFiles} />
         <button style={s.analyzeBtn(disabled)} disabled={disabled} onClick={handleAnalyze}>
           {loading && <span className="spinner" />}
           {buttonLabel}
         </button>
-        {(progress || error) && (
-          <p style={{ ...s.progressText, color: error ? '#e05252' : '#6b6b80' }}>
-            {error || progress}
-          </p>
+        {error && <ErrorBanner message={error} onRetry={files.length > 0 ? handleAnalyze : null} />}
+        {!error && progress && (
+          <p className="pulsing" style={s.progressText}>{progress}</p>
         )}
       </div>
 
       {/* Two-column results */}
-      <div style={s.resultsSection}>
+      <div className="results-section">
         {/* 300 px sidebar */}
-        <aside style={s.sidebar}>
+        <aside className="sidebar">
           <RiskMeter results={results} />
           <ClauseBreakdown results={results} activeFilter={filter} onFilter={setFilter} />
         </aside>
 
         {/* Main content */}
-        <main style={s.mainContent}>
+        <main className="main-content">
           {/* View tabs — only show when results are available */}
           {(allClauses.length > 0 || allRefs.length > 0) && (
             <ViewTabs
@@ -420,6 +451,12 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Footer */}
+      <footer className="legal-footer">
+        <p>⚖ FOR INFORMATIONAL PURPOSES ONLY — NOT LEGAL ADVICE</p>
+        <p>PocketLawyer uses AI to assist with contract review. Always consult a qualified lawyer before signing.</p>
+      </footer>
 
       <Chatbot
         results={results}
