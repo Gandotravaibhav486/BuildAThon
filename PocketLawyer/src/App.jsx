@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import UploadZone from './components/UploadZone.jsx'
 import ClauseCard from './components/ClauseCard.jsx'
+import HiddenRefCard from './components/HiddenRefCard.jsx'
 import { analyzeContract } from './utils/analyzeContract.js'
 
 /* ── Design tokens ─────────────────────────────────── */
@@ -189,6 +190,50 @@ function ClauseBreakdown({ results, activeFilter, onFilter }) {
   )
 }
 
+/* ── Main: View tabs (Clauses | References) ────────── */
+function ViewTabs({ active, onChange, clauseCount, refCount }) {
+  const tabs = [
+    { key: 'clauses',    label: 'Clauses',    count: clauseCount },
+    { key: 'references', label: 'References', count: refCount },
+  ]
+  return (
+    <div style={{ display: 'flex', borderBottom: '2px solid #e4ddd0', marginBottom: '1rem' }}>
+      {tabs.map(({ key, label, count }) => {
+        const isActive = active === key
+        return (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: '0.68rem',
+              letterSpacing: '0.1em',
+              padding: '0.6rem 1.1rem',
+              border: 'none',
+              borderBottom: isActive ? '2px solid #c9a84c' : '2px solid transparent',
+              marginBottom: '-2px',
+              background: 'transparent',
+              color: isActive ? '#c9a84c' : '#a0a0b8',
+              cursor: 'pointer',
+              transition: 'color 0.15s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            {label.toUpperCase()}
+            {count > 0 && (
+              <span style={{ background: isActive ? '#c9a84c22' : '#f0ebe3', color: isActive ? '#c9a84c' : '#a0a0b8', borderRadius: '99px', padding: '0 6px', fontSize: '0.6rem' }}>
+                {count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ── Main: Filter tabs ─────────────────────────────── */
 function FilterTabs({ active, onChange, counts }) {
   return (
@@ -238,6 +283,7 @@ export default function App() {
   const [results, setResults] = useState(null)
   const [error, setError]     = useState(null)
   const [filter, setFilter]   = useState('all')
+  const [view, setView]       = useState('clauses')
 
   const disabled = files.length === 0 || loading
 
@@ -247,6 +293,7 @@ export default function App() {
     setError(null)
     setResults(null)
     setFilter('all')
+    setView('clauses')
     setProgress(files.length > 5 ? 'Preparing analysis…' : '')
     try {
       const data = await analyzeContract(files, setProgress)
@@ -263,6 +310,7 @@ export default function App() {
 
   /* Derive filtered clause list + counts */
   const allClauses = results?.clauses ?? []
+  const allRefs    = results?.hiddenReferences ?? []
   const counts = { high: 0, medium: 0, low: 0, info: 0 }
   for (const c of allClauses) if (c.risk in counts) counts[c.risk]++
   const visible = filter === 'all' ? allClauses : allClauses.filter(c => c.risk === filter)
@@ -305,23 +353,55 @@ export default function App() {
 
         {/* Main content */}
         <main style={s.mainContent}>
-          {allClauses.length > 0 && (
-            <FilterTabs active={filter} onChange={setFilter} counts={counts} />
+          {/* View tabs — only show when results are available */}
+          {(allClauses.length > 0 || allRefs.length > 0) && (
+            <ViewTabs
+              active={view}
+              onChange={v => { setView(v); setFilter('all') }}
+              clauseCount={allClauses.length}
+              refCount={allRefs.length}
+            />
           )}
 
-          {visible.length > 0 ? (
-            visible.map((c, i) => <ClauseCard key={c.id} clause={c} index={i} />)
-          ) : (
-            <div style={s.emptyState}>
-              <span style={s.emptyIcon}>⚖️</span>
-              <span style={s.emptyText}>
-                {loading
-                  ? 'Analysing your contract…'
-                  : filter !== 'all'
-                  ? `No ${RISK[filter]?.label ?? filter} clauses found`
-                  : 'Upload a contract to see the full analysis'}
-              </span>
-            </div>
+          {/* ── Clauses view ── */}
+          {view === 'clauses' && (
+            <>
+              {allClauses.length > 0 && (
+                <FilterTabs active={filter} onChange={setFilter} counts={counts} />
+              )}
+              {visible.length > 0 ? (
+                visible.map((c, i) => <ClauseCard key={c.id} clause={c} index={i} />)
+              ) : (
+                <div style={s.emptyState}>
+                  <span style={s.emptyIcon}>⚖️</span>
+                  <span style={s.emptyText}>
+                    {loading
+                      ? 'Analysing your contract…'
+                      : filter !== 'all'
+                      ? `No ${RISK[filter]?.label ?? filter} clauses found`
+                      : 'Upload a contract to see the full analysis'}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── References view ── */}
+          {view === 'references' && (
+            <>
+              {allRefs.length > 0 ? (
+                allRefs.map((ref, i) => (
+                  <HiddenRefCard key={i} reference={ref} index={i} />
+                ))
+              ) : (
+                <div style={s.emptyState}>
+                  <span style={s.emptyIcon}>§</span>
+                  <span style={s.emptyText}>
+                    {loading ? 'Detecting references…' : 'No hidden references detected'}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>
