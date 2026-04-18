@@ -3,6 +3,7 @@ import UploadZone from './components/UploadZone.jsx'
 import ClauseCard from './components/ClauseCard.jsx'
 import HiddenRefCard from './components/HiddenRefCard.jsx'
 import SearchPanel from './components/SearchPanel.jsx'
+import Chatbot from './components/Chatbot.jsx'
 import { analyzeContract } from './utils/analyzeContract.js'
 
 /* ── Design tokens ─────────────────────────────────── */
@@ -284,8 +285,15 @@ export default function App() {
   const [progress, setProgress] = useState('')
   const [results, setResults] = useState(null)
   const [error, setError]     = useState(null)
-  const [filter, setFilter]   = useState('all')
-  const [view, setView]       = useState('clauses')
+  const [filter, setFilter]     = useState('all')
+  const [view, setView]         = useState('clauses')
+  const [chatOpen, setChatOpen] = useState(false)
+  const [triggerMsg, setTriggerMsg] = useState(null)
+
+  function askAssistant(msg) {
+    setTriggerMsg(msg)
+    setChatOpen(true)
+  }
 
   const disabled = files.length === 0 || loading
 
@@ -372,7 +380,7 @@ export default function App() {
                 <FilterTabs active={filter} onChange={setFilter} counts={counts} />
               )}
               {visible.length > 0 ? (
-                visible.map((c, i) => <ClauseCard key={c.id} clause={c} index={i} />)
+                visible.map((c, i) => <ClauseCard key={c.id} clause={c} index={i} onAskAssistant={askAssistant} />)
               ) : (
                 <div style={s.emptyState}>
                   <span style={s.emptyIcon}>⚖️</span>
@@ -412,6 +420,14 @@ export default function App() {
           )}
         </main>
       </div>
+
+      <Chatbot
+        results={results}
+        open={chatOpen}
+        onToggle={setChatOpen}
+        triggerMessage={triggerMsg}
+        onTriggerHandled={() => setTriggerMsg(null)}
+      />
     </div>
   )
 }

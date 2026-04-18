@@ -7,7 +7,7 @@ const RISK_META = {
   info:   { color: '#4a90d9', label: 'Key Clause',   bg: '#f0f6ff' },
 }
 
-export default function ClauseCard({ clause, index }) {
+export default function ClauseCard({ clause, index, onAskAssistant }) {
   const [open, setOpen] = useState(false)
   const meta = RISK_META[clause.risk] ?? RISK_META.info
   const num = String(clause.id).padStart(2, '0')
@@ -91,6 +91,7 @@ export default function ClauseCard({ clause, index }) {
 
           {/* Ask assistant */}
           <button
+            onClick={() => onAskAssistant?.(`Explain the §${num} "${clause.title}" clause in detail and advise me on what I should do about it.`)}
             style={{
               fontFamily: "'DM Mono', monospace",
               fontSize: '0.68rem',
