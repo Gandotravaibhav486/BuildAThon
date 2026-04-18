@@ -1,4 +1,10 @@
-const styles = {
+import { useState } from 'react'
+import UploadZone from './components/UploadZone.jsx'
+import { analyzeContract } from './utils/analyzeContract.js'
+
+const RISK_COLORS = { high: '#e05252', medium: '#e6a817', low: '#4caf7d' }
+
+const s = {
   page: {
     minHeight: '100vh',
     background: '#f5f1ea',
@@ -6,7 +12,7 @@ const styles = {
     flexDirection: 'column',
   },
 
-  /* ── Header ── */
+  /* Header */
   header: {
     background: '#1a1a2e',
     padding: '0 2rem',
@@ -17,20 +23,9 @@ const styles = {
     borderBottom: '3px solid #c9a84c',
     flexShrink: 0,
   },
-  logoGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-  },
-  logoEmoji: {
-    fontSize: '2rem',
-    lineHeight: 1,
-  },
-  logoText: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-  },
+  logoGroup: { display: 'flex', alignItems: 'center', gap: '0.75rem' },
+  logoEmoji: { fontSize: '2rem', lineHeight: 1 },
+  logoText: { display: 'flex', flexDirection: 'column', gap: '2px' },
   brandName: {
     fontFamily: "'Playfair Display', serif",
     fontWeight: 700,
@@ -44,7 +39,6 @@ const styles = {
     fontSize: '0.6rem',
     color: '#a0a0b8',
     letterSpacing: '0.18em',
-    lineHeight: 1,
   },
   headerBadge: {
     fontFamily: "'DM Mono', monospace",
@@ -56,55 +50,44 @@ const styles = {
     letterSpacing: '0.1em',
   },
 
-  /* ── Upload zone ── */
-  uploadSection: {
-    padding: '2.5rem 2rem 0',
-  },
-  uploadBox: {
-    border: '2px dashed #c9a84c',
-    borderRadius: '12px',
-    background: 'rgba(201,168,76,0.05)',
-    padding: '3rem 2rem',
+  /* Upload panel */
+  uploadPanel: {
+    padding: '2rem 2rem 0',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    gap: '0.75rem',
-    cursor: 'pointer',
-  },
-  uploadIcon: {
-    fontSize: '2.5rem',
-  },
-  uploadTitle: {
-    fontFamily: "'Playfair Display', serif",
-    fontSize: '1.2rem',
-    color: '#1a1a2e',
-    fontWeight: 700,
-  },
-  uploadHint: {
-    fontFamily: "'Lora', serif",
-    fontSize: '0.85rem',
-    color: '#6b6b80',
-  },
-  uploadMono: {
-    fontFamily: "'DM Mono', monospace",
-    fontSize: '0.7rem',
-    color: '#a0a0b8',
-    letterSpacing: '0.08em',
-  },
-  analyseBtn: {
-    marginTop: '1.25rem',
-    background: '#1a1a2e',
-    color: '#c9a84c',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '0.6rem 2rem',
-    fontFamily: "'DM Mono', monospace",
-    fontSize: '0.8rem',
-    letterSpacing: '0.12em',
-    cursor: 'pointer',
+    gap: '1rem',
   },
 
-  /* ── Two-column results ── */
+  /* Analyze button */
+  analyzeBtn: (disabled) => ({
+    width: '100%',
+    padding: '0.9rem 2rem',
+    background: disabled
+      ? '#e4ddd0'
+      : 'linear-gradient(135deg, #1a1510, #2d2418)',
+    color: disabled ? '#a0a0b8' : '#c9a84c',
+    border: 'none',
+    borderRadius: '8px',
+    fontFamily: "'Playfair Display', serif",
+    fontSize: '1rem',
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'opacity 0.2s',
+  }),
+  progressText: {
+    fontFamily: "'DM Mono', monospace",
+    fontSize: '0.72rem',
+    color: '#6b6b80',
+    letterSpacing: '0.06em',
+    textAlign: 'center',
+    minHeight: '1rem',
+  },
+
+  /* Two-column results */
   resultsSection: {
     flex: 1,
     display: 'flex',
@@ -142,19 +125,7 @@ const styles = {
     padding: '0.4rem 0',
     borderBottom: '1px solid #f0ebe3',
   },
-  riskLabel: {
-    fontFamily: "'Lora', serif",
-    fontSize: '0.85rem',
-    color: '#3a3a4a',
-  },
-  riskBadge: (color) => ({
-    fontFamily: "'DM Mono', monospace",
-    fontSize: '0.7rem',
-    color,
-    border: `1px solid ${color}`,
-    borderRadius: '4px',
-    padding: '2px 8px',
-  }),
+  riskLabel: { fontFamily: "'Lora', serif", fontSize: '0.85rem', color: '#3a3a4a' },
   scoreCircle: {
     width: '80px',
     height: '80px',
@@ -197,16 +168,6 @@ const styles = {
     borderRadius: '10px',
     border: '1px solid #e4ddd0',
     padding: '1.25rem 1.5rem',
-    borderLeft: '4px solid transparent',
-  },
-  clauseCardHigh: {
-    borderLeftColor: '#e05252',
-  },
-  clauseCardMed: {
-    borderLeftColor: '#e6a817',
-  },
-  clauseCardLow: {
-    borderLeftColor: '#4caf7d',
   },
   clauseHeader: {
     display: 'flex',
@@ -238,124 +199,163 @@ const styles = {
     borderRadius: '10px',
     border: '1px dashed #e4ddd0',
   },
-  emptyIcon: {
-    fontSize: '2.5rem',
-    opacity: 0.3,
-  },
-  emptyText: {
-    fontFamily: "'Lora', serif",
-    fontSize: '0.9rem',
-    color: '#a0a0b8',
-  },
+  emptyIcon: { fontSize: '2.5rem', opacity: 0.3 },
+  emptyText: { fontFamily: "'Lora', serif", fontSize: '0.9rem', color: '#a0a0b8' },
 }
 
-const RISK_COLORS = { High: '#e05252', Medium: '#e6a817', Low: '#4caf7d' }
-
-function RiskBadge({ level }) {
-  return <span style={styles.riskBadge(RISK_COLORS[level])}>{level}</span>
+function riskBadgeStyle(risk) {
+  const color = RISK_COLORS[risk] ?? '#a0a0b8'
+  return {
+    fontFamily: "'DM Mono', monospace",
+    fontSize: '0.7rem',
+    color,
+    border: `1px solid ${color}`,
+    borderRadius: '4px',
+    padding: '2px 8px',
+    textTransform: 'capitalize',
+    flexShrink: 0,
+  }
 }
 
-function ScoreCard() {
+function RiskBadge({ risk }) {
+  return <span style={riskBadgeStyle(risk)}>{risk}</span>
+}
+
+function ScoreCard({ results }) {
+  const score = results
+    ? results.overallRisk === 'high' ? 'High'
+      : results.overallRisk === 'medium' ? 'Med'
+      : 'Low'
+    : '—'
+
   return (
-    <div style={styles.sidebarCard}>
-      <p style={styles.sidebarCardTitle}>Risk Score</p>
-      <div style={styles.scoreCircle}>
-        <span style={styles.scoreNum}>—</span>
-        <span style={styles.scoreLabel}>/100</span>
+    <div style={s.sidebarCard}>
+      <p style={s.sidebarCardTitle}>Risk Score</p>
+      <div style={s.scoreCircle}>
+        <span style={s.scoreNum}>{score}</span>
+        {results && <span style={s.scoreLabel}>RISK</span>}
       </div>
-      <p style={styles.scoreVerdict}>Upload a contract to see your score</p>
+      <p style={s.scoreVerdict}>
+        {results ? results.riskSummary || results.summary : 'Upload a contract to see your score'}
+      </p>
     </div>
   )
 }
 
-function ClauseBreakdown() {
+function ClauseBreakdown({ results }) {
+  const counts = { High: 0, Medium: 0, Low: 0 }
+  if (results) {
+    for (const c of results.clauses ?? []) {
+      const key = c.risk ? c.risk.charAt(0).toUpperCase() + c.risk.slice(1) : null
+      if (key && key in counts) counts[key]++
+    }
+  }
+
   return (
-    <div style={styles.sidebarCard}>
-      <p style={styles.sidebarCardTitle}>Clause Breakdown</p>
-      {['High', 'Medium', 'Low'].map((level) => (
-        <div key={level} style={styles.riskRow}>
-          <span style={styles.riskLabel}>{level} Risk</span>
-          <RiskBadge level={level} />
+    <div style={s.sidebarCard}>
+      <p style={s.sidebarCardTitle}>Clause Breakdown</p>
+      {['High', 'Medium', 'Low'].map(level => (
+        <div key={level} style={s.riskRow}>
+          <span style={s.riskLabel}>{level} Risk</span>
+          <RiskBadge risk={level.toLowerCase()} />
         </div>
       ))}
     </div>
   )
 }
 
-function ClauseCardPlaceholder({ risk, title, excerpt }) {
-  const borderStyle =
-    risk === 'High'
-      ? styles.clauseCardHigh
-      : risk === 'Medium'
-      ? styles.clauseCardMed
-      : styles.clauseCardLow
-
+function ClauseCard({ clause }) {
+  const borderColor = RISK_COLORS[clause.risk] ?? '#e4ddd0'
   return (
-    <div style={{ ...styles.clauseCard, ...borderStyle }}>
-      <div style={styles.clauseHeader}>
-        <span style={styles.clauseTitle}>{title}</span>
-        <RiskBadge level={risk} />
+    <div style={{ ...s.clauseCard, borderLeft: `4px solid ${borderColor}` }}>
+      <div style={s.clauseHeader}>
+        <span style={s.clauseTitle}>{clause.title}</span>
+        <RiskBadge risk={clause.risk} />
       </div>
-      <p style={styles.clauseBody}>{excerpt}</p>
+      <p style={s.clauseBody}>{clause.explanation || clause.text}</p>
     </div>
   )
 }
 
 export default function App() {
+  const [files, setFiles] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [results, setResults] = useState(null)
+  const [error, setError] = useState(null)
+
+  const disabled = files.length === 0 || loading
+
+  async function handleAnalyze() {
+    if (disabled) return
+    setLoading(true)
+    setError(null)
+    setProgress(files.length > 5 ? 'Preparing analysis…' : '')
+    try {
+      const data = await analyzeContract(files, setProgress)
+      setResults(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+      setProgress('')
+    }
+  }
+
+  const buttonLabel = loading
+    ? progress || 'Analyzing Contract…'
+    : 'Analyze Contract'
+
   return (
-    <div style={styles.page}>
+    <div style={s.page}>
       {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.logoGroup}>
-          <span style={styles.logoEmoji}>⚖️</span>
-          <div style={styles.logoText}>
-            <span style={styles.brandName}>PocketLawyer</span>
-            <span style={styles.subtitle}>CONTRACT RISK ANALYZER</span>
+      <header style={s.header}>
+        <div style={s.logoGroup}>
+          <span style={s.logoEmoji}>⚖️</span>
+          <div style={s.logoText}>
+            <span style={s.brandName}>PocketLawyer</span>
+            <span style={s.subtitle}>CONTRACT RISK ANALYZER</span>
           </div>
         </div>
-        <span style={styles.headerBadge}>AI POWERED</span>
+        <span style={s.headerBadge}>AI POWERED</span>
       </header>
 
-      {/* Upload */}
-      <div style={styles.uploadSection}>
-        <div style={styles.uploadBox}>
-          <span style={styles.uploadIcon}>📄</span>
-          <span style={styles.uploadTitle}>Drop your contract here</span>
-          <span style={styles.uploadHint}>PDF or plain text — up to 50 pages</span>
-          <span style={styles.uploadMono}>SUPPORTED: PDF · TXT · DOCX</span>
-          <button style={styles.analyseBtn}>ANALYSE CONTRACT</button>
-        </div>
+      {/* Upload + Analyze */}
+      <div style={s.uploadPanel}>
+        <UploadZone files={files} onFilesChange={setFiles} />
+
+        <button style={s.analyzeBtn(disabled)} disabled={disabled} onClick={handleAnalyze}>
+          {loading && <span className="spinner" />}
+          {buttonLabel}
+        </button>
+
+        {(progress || error) && (
+          <p style={{ ...s.progressText, color: error ? '#e05252' : '#6b6b80' }}>
+            {error || progress}
+          </p>
+        )}
       </div>
 
       {/* Two-column results */}
-      <div style={styles.resultsSection}>
+      <div style={s.resultsSection}>
         {/* 300 px sidebar */}
-        <aside style={styles.sidebar}>
-          <ScoreCard />
-          <ClauseBreakdown />
+        <aside style={s.sidebar}>
+          <ScoreCard results={results} />
+          <ClauseBreakdown results={results} />
         </aside>
 
         {/* Main content */}
-        <main style={styles.mainContent}>
-          <ClauseCardPlaceholder
-            risk="High"
-            title="Unlimited Liability Clause"
-            excerpt="Placeholder — clause text will appear here once a contract is analysed."
-          />
-          <ClauseCardPlaceholder
-            risk="Medium"
-            title="Auto-Renewal Term"
-            excerpt="Placeholder — clause text will appear here once a contract is analysed."
-          />
-          <ClauseCardPlaceholder
-            risk="Low"
-            title="Governing Law"
-            excerpt="Placeholder — clause text will appear here once a contract is analysed."
-          />
-          <div style={styles.emptyState}>
-            <span style={styles.emptyIcon}>⚖️</span>
-            <span style={styles.emptyText}>Upload a contract to see the full analysis</span>
-          </div>
+        <main style={s.mainContent}>
+          {results?.clauses?.length > 0 ? (
+            results.clauses.map(c => <ClauseCard key={c.id} clause={c} />)
+          ) : (
+            <div style={s.emptyState}>
+              <span style={s.emptyIcon}>⚖️</span>
+              <span style={s.emptyText}>
+                {loading ? 'Analysing your contract…' : 'Upload a contract to see the full analysis'}
+              </span>
+            </div>
+          )}
         </main>
       </div>
     </div>
